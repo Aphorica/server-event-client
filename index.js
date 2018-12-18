@@ -38,9 +38,9 @@ class ServerEventClient {
   }
 
   getSSEStateText() {
-    return this.SSESource.readyState === EventSource.CLOSED? "Disconnected" :
+    return this.SSESource.readyState === EventSource.CLOSED? "Closed" :
            this.SSESource.readyState === EventSource.CONNECTING? "Connecting" :
-           "Connected";
+           "Open";
   }  
 
   async makeID() {
