@@ -1,10 +1,11 @@
 {
   "name": "@aphorica/server-event-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Maintains the server event connection on the client side",
   "main": "index.js",
   "repository": "https://github.com/Aphorica/server-event-client",
   "author": "Rick Berger - Aphorica, Inc <gbergeraph@gmail.com>",
   "license": "MIT",
+  "keywords": ["javascript", "EventSource","ServerEvents"],
   "private": false
 }
