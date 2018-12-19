@@ -28,6 +28,7 @@ class ServerEventClient {
     this.SSESource = null;
     this.myName = name;
     this.myID = null,
+    this.submitTaskPending = null;
     this.mAxios = axios.create({
       baseURL: appurl
     });
@@ -56,24 +57,39 @@ class ServerEventClient {
     return status;
   }
 
-  async submitTask(taskname) {
-    let status;
-    try {
-      let status = true, rsp;
-      if (this.SSESource === null ||
-          this.SSESource.readyState === EventSource.CLOSED)
-        status = await this.registerServerListener();
+  async doSubmitTask(taskname) {
+    let status = true;
+    try {        
+      let rsp = await this.mAxios.put(
+        this.PREFIX + ["submit-task", this.myID, taskname].join('/'));
 
-      if (!status) {
+    } catch(err) {
+      console.error("Error in doSubmitTask: " + err);
+      status = false;
+    }
+
+    return status;
+  }
+
+  async submitTask(taskname) {
+    let status = true;
+    let rsp;
+    if (this.SSESource === null ||
+        this.SSESource.readyState === EventSource.CLOSED) {
+      status = await this.registerServerListener();
+
+      if (status) 
+        this.submitTaskPending = this.doSubmitTask.bind(this, taskname);
+                // can't submit until the registration is complete...
+
+      else {
         console.error("Can't re-register a ServerListener -- bailing");
         await this.unregisterServerListener();
-      }
-      rsp = this.mAxios.put(
-          this.PREFIX + ["submit-task", this.myID, taskname].join('/'));
-      status = true;
-    } catch(err) {
-      console.error("Error in submitTask: " + err);
-      status = false;
+        return;
+      }          
+    } else {
+      status = await this.doSubmitTask(taskname);
+                // registered - go ahead and submit
     }
 
     return status;
@@ -114,7 +130,23 @@ class ServerEventClient {
   }
 
   static openListener(evt) {
+            // registration is complete when this is called
+            
     this.cb.sseOpened(this.SSESource.readyState, this.getSSEStateText());
+            // notify the caller.
+
+    if (this.submitTaskPending !== null) {
+                // if we have a submission pending, finish it now.
+
+      let _this = this;
+      setTimeout(async ()=>{
+        let status = await _this.submitTaskPending();
+        _this.submitTaskPending = null;
+        if (!status) {
+          console.error('ServerEventClient:sseOpened:submitTaskPending failed');
+        }
+      });
+    }
   }
 
   static errorListener(evt){
@@ -126,7 +158,7 @@ class ServerEventClient {
     if (!!window.EventSource) {
       this.SSESource = new EventSource(
         this.APPURL + this.PREFIX + 'register-listener/' + this.myID);
-
+      
       this.notificationListenerCB = ServerEventClient.notificationListener.bind(this);
       this.openListenerCB = ServerEventClient.openListener.bind(this);
       this.errorListenerCB = ServerEventClient.errorListener.bind(this);
@@ -148,24 +180,28 @@ class ServerEventClient {
 
   async disconnect() {
     try {
-      let rsp = axios.get(
-        this.PREFIX + ['disconnect-registrant', this.myID].join('/'));
+      let status;
+      let rsp = await this.mAxios.get(
+        this.PREFIX + 'disconnect-registrant/' + this.myID);
+        this.SSESource.removeEventListener('message', this.notificationListenerCB);
+        this.SSESource.removeEventListener('open', this.openListenerCB);
+        this.SSESource.removeEventListener('error', this.errorListenerCB);
+                  // remove listeners to prevent 'ghost' calls after
+                  // the instance has been assigned to null, but not
+                  // gc'ed, yet.
+    
+        this.SSESource = null;
+                  // now assign to null
+    
+        this.cb.sseClosed();
+                  // notify the caller we're disconnected.
+        status = true;
     } catch(err) {
       console.error('ServerEventClient:disconnect, error: ' + err);
+      status = false;
     }
 
-    this.SSESource.removeEventListener('message', this.notificationListenerCB);
-    this.SSESource.removeEventListener('open', this.openListenerCB);
-    this.SSESource.removeEventListener('error', this.errorListenerCB);
-              // remove listeners to prevent 'ghost' calls after
-              // the instance has been assigned to null, but not
-              // gc'ed, yet.
-
-    this.SSESource = null;
-              // now assign to null
-
-    this.cb.sseClosed();
-              // notify the caller we're disconnected.
+    return status;
   }
 
   async fetchRegistrants() {
