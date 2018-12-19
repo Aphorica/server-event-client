@@ -3,8 +3,8 @@
 Client-side utility for registering and maintaining _EventSource_ connections.
 
 See also:
- - [@aphorica/server-event-mgr][1] - server-side implentation of a server-event service.
- - [server-event-demo][2] - docker-compose file that sets up a development environment to test/demo.
+ - [@aphorica/server-event-mgr](https://www.npmjs.com/package/@aphorica/server-event-client) - server-side implentation of a server-event service.
+ - [server-event-demo](https://www.npmjs.com/package/@aphorica/server-event-client) - docker-compose file that sets up a development environment to test/demo.
 
 ## Overview
 The EventSource object is provided by the browser (or a polyfill in the case of non-support (IE/Edge)) to manage long-lived _keep-alive_ connections with the server, and to keep them open until closed.
@@ -108,5 +108,3 @@ Invokes call to force the server to trigger an immediate reponse.</dd>
 <dd>
 Invokes call to force the server to do an immediate cleanup pass.</dd>
 </dl>
-[1]:https:npmjs.org/@aphorica/server-event-client
-[2]:https://github.com/Aphorica/server-event-demo
