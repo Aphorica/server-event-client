@@ -3,8 +3,8 @@
 Client-side utility for registering and maintaining _EventSource_ connections.
 
 See also:
- - @aph/server-event-mgr - server-side implentation of a server-event service.
- - @aph/server-event-demo - docker-compose file that sets up a development environment to test/demo.
+ - @aphorica/server-event-mgr - server-side implentation of a server-event service.
+ - [server-event-demo][1] - docker-compose file that sets up a development environment to test/demo.
 
  ## Overview
  The EventSource object is provided by the browser (or a polyfill in the case of non-support (IE/Edge)) to manage long-lived _keep-alive_ connections with the server, and to keep them open until closed.
@@ -105,3 +105,4 @@ See also:
  <dd>
  Invokes call to force the server to do an immediate cleanup pass.</dd>
  </dl>
+[1]:https://github.com/Aphorica/server-event-demo
