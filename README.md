@@ -1,4 +1,4 @@
-# @aph/server-event-client
+# @aphorica/server-event-client
 
 Client-side utility for registering and maintaining _EventSource_ connections.
 
@@ -108,4 +108,5 @@ Invokes call to force the server to trigger an immediate reponse.</dd>
 <dd>
 Invokes call to force the server to do an immediate cleanup pass.</dd>
 </dl>
-[1]:https://github.com/Aphorica/server-event-demo
+[1]:https:npmjs.org/@aphorica/server-event-client
+[2]:https://github.com/Aphorica/server-event-demo
