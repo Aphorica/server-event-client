@@ -9,9 +9,9 @@ See also:
 ## Overview
 The EventSource object is provided by the browser (or a polyfill in the case of non-support (IE/Edge)) to manage long-lived _keep-alive_ connections with the server, and to keep them open until closed.
 
-It is a tentatively simpler and less resource-intensive mechanism than web-sockets, however there are server considerations that add a certain amount of complication (see @aph/server-event-mgr, _Overview_ section.)
+It is a tentatively simpler and less resource-intensive mechanism than web-sockets, however there are server considerations that add a certain amount of complication (see @aphorica/server-event-mgr, _Overview_ section.)
 
-This utility provides a EventSource implementation that, in turn, is tuned to the server implementation provided by the @aph/server-event-mgr.
+This utility provides a EventSource implementation that, in turn, is tuned to the server implementation provided by the @aphorica/server-event-mgr.
 
 It also provides debugging invocations into the server to aid in development.
 
