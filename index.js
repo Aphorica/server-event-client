@@ -1,5 +1,8 @@
 import axios from 'axios';
 
+const LISTEN_TYPE = 1;
+const TASK_TYPE = 2;
+
 function getNotificationData(_data) {
   let data = _data.charAt(0) === '"'? _data.slice(1,-1) : _data;
             // dequote if quoted
@@ -20,6 +23,15 @@ function getNotificationData(_data) {
   return retData;
 }
 
+function submitPendingRequest(pendingRequest) {
+  setTimeout(async ()=>{
+    let status = await pendingRequest();
+    if (!status) {
+      console.error('pendingRequest failed');
+    }
+  });
+}
+
 class ServerEventClient {
   constructor(name, appurl, cb, prefix) {
     this.cb = cb;
@@ -28,17 +40,45 @@ class ServerEventClient {
     this.SSESource = null;
     this.myName = name;
     this.myID = null,
-    this.submitTaskPending = null;
+    this.pendingRequests = {};
     this.mAxios = axios.create({
       baseURL: appurl
     });
   }
 
-  getSSEState() {
+  
+  async _queueSubmission(type, name, submissionFunc) {
+    let status = true;
+    let rsp;
+    if (this.SSESource === null || this.SSESource.readyState !== EventSource.OPEN) {
+      if (this.SSESource === null || this.SSESource.readyState === EventSource.CLOSED)
+        status = await this.registerServerListener();
+
+      if (status) 
+        this.pendingRequests[name] = {type: type, func: submissionFunc};
+                // can't submit until the registration is complete...
+
+      else {
+        console.error("SSEClient:submitTask, Can't re-register a ServerListener -- bailing");
+        await this.unregisterServerListener();
+      }          
+    } else {
+      status = await submissionFunc();
+                // registered - go ahead and submit
+    }
+
+    return status;
+  }
+
+  get id() {
+    return this.myID;
+  }
+
+  get SSEState() {
     return this.SSESource.readyState;
   }
 
-  getSSEStateText() {
+  get SSEStateText() {
     return this.SSESource.readyState === EventSource.CLOSED? "Closed" :
            this.SSESource.readyState === EventSource.CONNECTING? "Connecting" :
            "Open";
@@ -50,7 +90,7 @@ class ServerEventClient {
       this.myID = rsp.data;
       status = true;
     } catch(err) {
-      console.error("Error in makeID: " + err);
+      console.error("SSEClient:makeid, Error: " + err);
       status = false;
     }
 
@@ -62,9 +102,8 @@ class ServerEventClient {
     try {        
       let rsp = await this.mAxios.put(
         this.PREFIX + ["submit-task", this.myID, taskname].join('/'));
-
     } catch(err) {
-      console.error("Error in doSubmitTask: " + err);
+      console.error("SSEClient:doSubmitTask: " + err);
       status = false;
     }
 
@@ -72,33 +111,31 @@ class ServerEventClient {
   }
 
   async submitTask(taskname) {
+    status = await this._queueSubmission(TASK_TYPE, taskname, this.doSubmitTask.bind(this, taskname));
+    return status;
+  }
+
+  async doListen(listenKey) {
     let status = true;
-    let rsp;
-    if (this.SSESource === null ||
-        this.SSESource.readyState === EventSource.CLOSED) {
-      status = await this.registerServerListener();
-
-      if (status) 
-        this.submitTaskPending = this.doSubmitTask.bind(this, taskname);
-                // can't submit until the registration is complete...
-
-      else {
-        console.error("Can't re-register a ServerListener -- bailing");
-        await this.unregisterServerListener();
-        return;
-      }          
-    } else {
-      status = await this.doSubmitTask(taskname);
-                // registered - go ahead and submit
+    console.log('SSEClient:doListen, listenKey: ' + listenKey);
+    try {
+      let rsp = await this.mAxios.put(this.PREFIX + ['listen', this.myID, listenKey].join('/'));
+    } catch(err) {
+      console.error('SSEClient:listen, Error: ' + err);
     }
 
+    return status;
+  }
+
+  async listen(listenKey) {
+    let status = await this._queueSubmission(LISTEN_TYPE, listenKey, this.doListen.bind(this, listenKey));
     return status;
   }
 
   /**
    * Event listeners get bound to an instance at runtime,
    * so they have a valid 'this'.  Could pull these out of
-   * the class, but that they are bound to an instance
+   * the class, but that they are (eventually) bound to an instance
    * really makes them dependent on the class definition.
    * 
    * @param {*} evt 
@@ -107,20 +144,24 @@ class ServerEventClient {
     let data = getNotificationData(evt.data);
 
     switch(data.response) {
-      case "listeners-changed":
-        this.cb.sseListenersChanged();
+      case "notify":
+        if (this.cb.sseNotify)
+          this.cb.sseNotify(notifyKey, data.info);
         break;
 
       case "completed":
-        this.cb.sseTaskCompleted(data.info.id, data.info.taskid);
+        if (this.cb.sseTaskCompleted)
+          this.cb.sseTaskCompleted(data.info.id, data.info.taskid);
         break;
 
       case "registered":
-        this.cb.sseRegistered(data.info);
+        if (this.cb.sseRegistered)
+          this.cb.sseRegistered(data.info);
         break;
 
       case "ad-hoc":
-        this.cb.sseAdHockResponse();
+        if (this.cb.sseAdHocResponse)
+          this.cb.sseAdHocResponse();
         break;
 
       default:
@@ -131,27 +172,30 @@ class ServerEventClient {
 
   static openListener(evt) {
             // registration is complete when this is called
-            
-    this.cb.sseOpened(this.SSESource.readyState, this.getSSEStateText());
-            // notify the caller.
+    let pendingKeys = Object.keys(this.pendingRequests), ix, name, pendingReq;
 
-    if (this.submitTaskPending !== null) {
-                // if we have a submission pending, finish it now.
+    if (this.cb.sseOpened)
+      this.cb.sseOpened(this.SSESource.readyState, this.SSEStateText);
+            // notify the caller we received the open event
 
-      let _this = this;
-      setTimeout(async ()=>{
-        let status = await _this.submitTaskPending();
-        _this.submitTaskPending = null;
-        if (!status) {
-          console.error('ServerEventClient:sseOpened:submitTaskPending failed');
-        }
-      });
+    for (ix = 0; ix < pendingKeys.length; ++ix) {
+                  // if we have submissions pending, we can do them now.
+      name = pendingKeys[ix];
+      pendingReq = this.pendingRequests[name];
+      submitPendingRequest(pendingReq.func);
+
+      if (pendingReq.type === TASK_TYPE)
+        delete this.pendingRequests[name];
+            // remove tasks from the pendingRequests map -
+            // (listen requests will get resubmitted
+            //   if opened again.)
     }
   }
 
   static errorListener(evt){
-    this.cb.sseError(this.SSESource.readyState, this.getSSEStateText());
-  };
+    if (this.cb.sseError)
+      this.cb.sseError(this.SSESource.readyState, this.SSEStateText);
+  }
 
   async registerServerListener() {
     let status;
@@ -162,8 +206,8 @@ class ServerEventClient {
       this.notificationListenerCB = ServerEventClient.notificationListener.bind(this);
       this.openListenerCB = ServerEventClient.openListener.bind(this);
       this.errorListenerCB = ServerEventClient.errorListener.bind(this);
-            // define member listener funcs bound to this, so they
-            // can be removed.
+            // define member listener funcs bound to 'this', so the
+            // listeners will have a valid 'this' and they can be removed.
 
       this.SSESource.addEventListener('message', this.notificationListenerCB);
       this.SSESource.addEventListener('open', this.openListenerCB);
