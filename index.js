@@ -117,7 +117,6 @@ class ServerEventClient {
 
   async doListen(listenKey) {
     let status = true;
-    console.log('SSEClient:doListen, listenKey: ' + listenKey);
     try {
       let rsp = await this.mAxios.put(this.PREFIX + ['listen', this.myID, listenKey].join('/'));
     } catch(err) {
@@ -146,7 +145,7 @@ class ServerEventClient {
     switch(data.response) {
       case "notify":
         if (this.cb.sseNotify)
-          this.cb.sseNotify(notifyKey, data.info);
+          this.cb.sseNotify(data.info);
         break;
 
       case "completed":
@@ -184,7 +183,7 @@ class ServerEventClient {
       pendingReq = this.pendingRequests[name];
       submitPendingRequest(pendingReq.func);
 
-      if (pendingReq.type === TASK_TYPE)
+      // if (pendingReq.type === TASK_TYPE)
         delete this.pendingRequests[name];
             // remove tasks from the pendingRequests map -
             // (listen requests will get resubmitted
