@@ -150,17 +150,12 @@ class ServerEventClient {
 
       case "completed":
         if (this.cb.sseTaskCompleted)
-          this.cb.sseTaskCompleted(data.info.id, data.info.taskid);
+          this.cb.sseTaskCompleted(data.info.taskid);
         break;
 
       case "registered":
         if (this.cb.sseRegistered)
           this.cb.sseRegistered(data.info);
-        break;
-
-      case "ad-hoc":
-        if (this.cb.sseAdHocResponse)
-          this.cb.sseAdHocResponse();
         break;
 
       default:
@@ -256,17 +251,6 @@ class ServerEventClient {
       console.error("Error in ServerEventClient:fetchRegistrants: " + err);
     }
     return data;
-  }
-
-  async triggerAdHocServerResponse() {
-    try {
-      let rsp = await this.mAxios.get(this.PREFIX +
-                                     ['trigger-ad-hoc', this.myID].join('/'));
-    } catch(err) {
-      console.error("Error in ServerEventClient:triggerAdHocServerResponse");
-    }
-
-    return 'ok';
   }
 
   async triggerCleanup() {

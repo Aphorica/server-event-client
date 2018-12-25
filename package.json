@@ -1,6 +1,6 @@
 {
   "name": "@aphorica/server-event-client",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Maintains the server event connection on the client side",
   "main": "index.js",
   "repository": "https://github.com/Aphorica/server-event-client",
