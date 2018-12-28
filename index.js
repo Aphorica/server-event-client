@@ -3,6 +3,11 @@ import axios from 'axios';
 const LISTEN_TYPE = 1;
 const TASK_TYPE = 2;
 
+if (!window.EventSource) {
+  let EventSource = require('eventsource');
+  window.EventSource = EventSource;
+}
+
 function getNotificationData(_data) {
   let data = _data.charAt(0) === '"'? _data.slice(1,-1) : _data;
             // dequote if quoted
@@ -192,26 +197,30 @@ class ServerEventClient {
   }
 
   async registerServerListener() {
-    let status;
+    let status = false;
     if (!!window.EventSource) {
       this.SSESource = new EventSource(
-        this.APPURL + this.PREFIX + 'register-listener/' + this.myID);
-      
-      this.notificationListenerCB = ServerEventClient.notificationListener.bind(this);
-      this.openListenerCB = ServerEventClient.openListener.bind(this);
-      this.errorListenerCB = ServerEventClient.errorListener.bind(this);
-            // define member listener funcs bound to 'this', so the
-            // listeners will have a valid 'this' and they can be removed.
+        this.APPURL + this.PREFIX + 'register-listener/' + this.myID,
+        {
+         https: {rejectUnauthorized: false}
+        });
 
-      this.SSESource.addEventListener('message', this.notificationListenerCB);
-      this.SSESource.addEventListener('open', this.openListenerCB);
-      this.SSESource.addEventListener('error', this.errorListenerCB);
-      status = true;
+      if (this.SSESource) { 
+        this.notificationListenerCB = ServerEventClient.notificationListener.bind(this);
+        this.openListenerCB = ServerEventClient.openListener.bind(this);
+        this.errorListenerCB = ServerEventClient.errorListener.bind(this);
+              // define member listener funcs bound to 'this', so the
+              // listeners will have a valid 'this' and they can be removed.
 
-    } else {
-      console.error("Error in ServerEventClient:registerListener - SSE Not supported");
-      status = false;
+        this.SSESource.addEventListener('message', this.notificationListenerCB);
+        this.SSESource.addEventListener('open', this.openListenerCB);
+        this.SSESource.addEventListener('error', this.errorListenerCB);
+        status = true;
+      }
     }
+    
+    if (!status)
+      console.error("Error in ServerEventClient:registerListener - SSE Not supported");
 
     return status;
   }
