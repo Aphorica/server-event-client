@@ -275,6 +275,10 @@ class ServerEventClient {
 
 class ServerEventClientFactory {
   static async create(name, appurl, cb, prefix) {
+    if (appurl.charAt(appurl.length - 1) === '/')
+      appurl = appurl.slice(0, -1);
+                    // remove any trailing slashes.
+
     let client = new ServerEventClient(name, appurl, cb, prefix, true);
     let status;
     status = await client.makeID();
